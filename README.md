@@ -188,7 +188,7 @@ The new `render.yaml` points to `AsmiSriva20/HydroGuard`, branch `main`, service
 
 1. Push this repository to GitHub.
 2. In Render, create a new Blueprint from HydroGuard. Render builds the root Dockerfile and serves the frontend and API together.
-3. Set `MONGO_URI` to a reachable MongoDB Atlas URI, with a database user and network access configured. Keep secrets in Render environment settings. The Blueprint generates a new admin key.
+3. Set `MONGO_URI` to a reachable MongoDB Atlas URI, with a database user and network access configured. Keep secrets in Render environment settings. Supply `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` there too; start the bot from the receiving Telegram chat first. These values are never stored in the Blueprint. The Blueprint generates a new admin key.
 4. Test the new URL, `/health`, `/docs`, demo states and charts.
 5. Remove the previous service through its Render settings once the new service works. Check that its MongoDB database is not shared before deleting any old data.
 
