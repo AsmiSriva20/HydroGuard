@@ -1,0 +1,36 @@
+services:
+  - type: web
+    runtime: docker
+    name: hydroguard
+    repo: https://github.com/AsmiSriva20/HydroGuard
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    envVars:
+      - key: APP_NAME
+        value: HydroGuard
+      - key: APP_ENV
+        value: production
+      - key: MONGO_DB
+        value: hydroguard
+      - key: MONGO_URI
+        sync: false
+      - key: ADMIN_API_KEY
+        generateValue: true
+      - key: DEMO_PUBLIC_ACTIONS_ENABLED
+        value: "true"
+      - key: DEMO_DEVICE_ID
+        value: device01
+      - key: MQTT_ENABLED
+        value: "false"
+      - key: ALERT_DURATION_THRESHOLD_SEC
+        value: "300"
+      - key: DEVICE_OFFLINE_AFTER_SEC
+        value: "60"
+      - key: ALERT_COOLDOWN_SEC
+        value: "300"
+      - key: AUTOMATIC_SHUTOFF_ENABLED
+        value: "false"

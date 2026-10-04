@@ -1,0 +1,138 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: hydroguard-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "--eval",
+          "db.adminCommand('ping').ok",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: hydroguard-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mosquitto_pub -h localhost -p 1883 -t healthcheck -m ping >/dev/null 2>&1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  backend:
+    build:
+      context: .
+    container_name: hydroguard-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "8000"
+      APP_ENV: "${APP_ENV:-development}"
+      LOG_LEVEL: "INFO"
+
+      MONGO_URI: "mongodb://mongo:27017"
+      MONGO_DB: "smart_water"
+
+      MQTT_HOST: "mosquitto"
+      MQTT_PORT: "1883"
+      MQTT_CLIENT_ID: "fastapi-backend"
+
+      ALERT_DURATION_THRESHOLD_SEC: "${ALERT_DURATION_THRESHOLD_SEC:-300}"
+      ALERT_COOLDOWN_SEC: "${ALERT_COOLDOWN_SEC:-300}"
+      AUTOMATIC_SHUTOFF_ENABLED: "${AUTOMATIC_SHUTOFF_ENABLED:-false}"
+      CRITICAL_FLOW_RATE_LPM: "${CRITICAL_FLOW_RATE_LPM:-0.3}"
+      DEMO_TIME_SCALE: "${DEMO_TIME_SCALE:-10}"
+
+      DEVICE_OFFLINE_AFTER_SEC: "${DEVICE_OFFLINE_AFTER_SEC:-60}"
+      DEVICE_STATUS_CHECK_INTERVAL_SEC: "${DEVICE_STATUS_CHECK_INTERVAL_SEC:-10}"
+
+      ADMIN_API_KEY: "${ADMIN_API_KEY:-}"
+      DEMO_PUBLIC_ACTIONS_ENABLED: "${DEMO_PUBLIC_ACTIONS_ENABLED:-true}"
+      DEMO_DEVICE_ID: "${DEMO_DEVICE_ID:-device01}"
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}"
+
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
+      TELEGRAM_CHAT_ID: "${TELEGRAM_CHAT_ID:-}"
+
+    volumes:
+      - ./app:/app/app
+      - ./simulator:/app/simulator
+
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--reload",
+      ]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: hydroguard-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  simulator:
+    build:
+      context: .
+    profiles:
+      - tools
+    environment:
+      MQTT_HOST: "mosquitto"
+      MQTT_PORT: "1883"
+    volumes:
+      - ./simulator:/app/simulator
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    command: ["multi", "--count", "5", "--duration", "360"]
+    entrypoint:
+      [
+        "python",
+        "-m",
+        "simulator",
+      ]
+
+volumes:
+  mongo_data:
+  mosquitto_data:
+  mosquitto_log:
